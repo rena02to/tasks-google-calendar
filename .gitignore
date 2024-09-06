@@ -165,7 +165,8 @@ dmypy.json
 cython_debug/
 
 #credentials do google console cloud
-calendar/quickstart/credentials.json
+credentials.json
+token.json
 
 # PyCharm
 #  JetBrains specific template is maintained in a separate JetBrains.gitignore that can
