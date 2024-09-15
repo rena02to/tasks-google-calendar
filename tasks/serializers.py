@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Task
+from .models import Task, OAUTHToken
 
 class TaskSerializer(serializers.ModelSerializer):
     class Meta:
@@ -14,3 +14,8 @@ class TaskSerializer(serializers.ModelSerializer):
             time = validated_data['time']
         )
         return task
+
+class OAUTHTokenSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = OAUTHToken
+        fields = '__all__'

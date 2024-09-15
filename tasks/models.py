@@ -17,12 +17,22 @@ class User(AbstractUser):
         return self.email
 
 class Task(models.Model):
+    id = models.CharField(max_length=255, primary_key=True)
     title = models.CharField(max_length=75)
     description = models.TextField()
-    date = models.DateField()
-    time = models.TimeField(blank=True, null=True)
+    locale = models.CharField(max_length=255)
+    full_day = models.BooleanField()
+    start_date = models.DateField()
+    start_hour = models.TimeField()
+    end_date = models.DateField()
+    end_hour = models.TimeField()
+    participants = models.JSONField(default=list)
+    reminders = models.JSONField(default=list)
+    appellant = models.BooleanField()
+    recurrence =  models.CharField(max_length=100)
     created_at = models.DateTimeField(auto_now_add=True)
     update_at = models.DateTimeField(auto_now=True)
+
 
     def __str__(self):
         return self.title

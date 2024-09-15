@@ -35,7 +35,7 @@ class UserAdmin(BaseUserAdmin):
 
 @admin.register(Task)
 class TaskAdmin(admin.ModelAdmin):
-    list_display = ('title', 'description', 'date', 'time', 'created_at', 'update_at')
+    list_display = ('title', 'description', 'full_day', 'start_date', 'start_hour', 'end_date', 'end_hour', 'participants', 'reminders', 'recurrence', 'created_at', 'update_at')
     search_fields = ('title', 'description', 'date', 'time')
 
 @admin.register(OAUTHToken)

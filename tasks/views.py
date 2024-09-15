@@ -5,28 +5,28 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from django.contrib.auth import get_user_model
 from datetime import datetime, timedelta
-from django.conf import settings
-import jwt
 from .models import OAUTHToken
 import pytz
+from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework_simplejwt.tokens import RefreshToken
+from .serializers import OAUTHTokenSerializer
+from google.oauth2.credentials import Credentials
 
-SCOPES = [
-    'openid',
-    'https://www.googleapis.com/auth/userinfo.email',
-    'https://www.googleapis.com/auth/userinfo.profile',
-    'https://www.googleapis.com/auth/calendar'
-]
 User = get_user_model()
 
 class Login(APIView):
+    permission_classes = [AllowAny]
     def post(self, request):
+        SCOPES = ['openid', 'https://www.googleapis.com/auth/userinfo.email', 'https://www.googleapis.com/auth/userinfo.profile', 'https://www.googleapis.com/auth/calendar']
         #definition of the Google API and what will be requested in the service
-        flow = InstalledAppFlow.from_client_secrets_file(
-            "credentials.json",
-            SCOPES
-        )
+        flow = InstalledAppFlow.from_client_secrets_file("credentials.json", SCOPES)
+
         try:
-            #open the browser to authenticate
+            #cria o serviço para interagir com a API do Google Calendar
+
+            ##############     trocar a porta no último commit    ##############
+
             creds = flow.run_local_server(port=54857, prompt='select_account')
             service = build('oauth2', 'v2', credentials=creds)
             #recupera o e-mail
@@ -48,7 +48,7 @@ class Login(APIView):
             #create the user's OAuth token in the db
             OAUTHToken.objects.update_or_create(
                 user = user,
-                defaults={
+                defaults = {
                     'access_token': creds.token,
                     'refresh_token': creds.refresh_token,
                     'client_id': creds.client_id,
@@ -60,19 +60,84 @@ class Login(APIView):
                 }
             )
 
-            #payload from jwt
-            payload = {
-                'user_id': user.id,
-                'email': user.email,
-                'exp': datetime.utcnow() + settings.JWT_SETTINGS['ACCESS_TOKEN_LIFETIME'],
-            }
-
-            #generate JWT token
-            token = jwt.encode(payload, settings.JWT_SETTINGS['SIGNING_KEY'], algorithm=settings.JWT_SETTINGS['ALGORITHM'])
+            #jwt
+            token = RefreshToken.for_user(user)
+            token = str(token.access_token)
 
             return Response({'message': 'Login successful', 'Access token': token}, status=status.HTTP_200_OK)
         except:
             return Response({'message': 'An error occurred in the login process'}, status=status.HTTP_400_BAD_REQUEST)
 
+
+#alterar a mensagem de view protected
+@permission_classes([IsAuthenticated])
+@api_view(['POST'])
 def Create(request):
-    pass
+    SCOPES = ['https://www.googleapis.com/auth/calendar']
+    #retrieves data from the database
+    user = request.user
+    token = OAUTHToken.objects.get(user=user)
+    #use the serializer to leave it in the correct format
+    oauth_token = OAUTHTokenSerializer(token).data
+    
+    event = request.data
+
+    #from the db data, assemble the credentials to use in the Google Calendar request
+    creds = Credentials(
+        token = oauth_token.get("access_token"),
+        refresh_token = oauth_token.get("refresh_token"),
+        token_uri=oauth_token.get('token_uri'),
+        client_id=oauth_token.get("client_id"),
+        client_secret=oauth_token.get("client_secret"),
+        scopes=oauth_token.get("scopes").split(','),
+    )
+
+    #create the service to interact with the Google Calendar API
+    service = build('calendar', 'v3', credentials=creds)
+
+    #is it an all-day event?
+    if event.get('full_day') == True:
+        start = event.get('start_date')
+        end = event.get('end_date')
+    else:
+        start = f'{event.get('start_date')}T{event.get('start_hour')}-03:00'
+        end = f'{event.get('end_date')}T{event.get('end_hour')}-03:00'
+    
+    #is it recurring?
+    if event.get('appellant') == True:
+        recurrence = event.get('recurrence')
+    else:
+        recurrence = None
+
+    #set up the event based on the request
+    event = {
+        'summary': event.get('title'),
+        'location': event.get('locale'),
+        'description': event.get('description'),
+        'start': {
+            'dateTime': start,
+            'timeZone': 'America/Sao_Paulo',
+        },
+        'end': {
+            'dateTime': end,
+            'timeZone': 'America/Sao_Paulo',
+        },
+        'attendees': event.get('participants'),
+        'reminders': {
+            'useDefault': False,
+            'overrides': event.get('reminders'),
+        },
+        'recurrence': [
+            recurrence
+        ],
+    }
+
+    #create the event on google calendar
+    try:
+        result = service.events().insert(calendarId='primary', body=event).execute()
+
+        ############# Criar o evendo no db #############
+
+        return Response({'message': 'Event created successfully!', 'link': result.get('htmlLink')})
+    except Exception as e:
+        return Response({'message': f'Error creating event: {e}'})
