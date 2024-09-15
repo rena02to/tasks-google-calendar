@@ -1,16 +1,37 @@
 from pathlib import Path
+from datetime import timedelta
+from django.conf import settings
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = 'django-insecure-&e=z1c%nz@ioy^3cpzew58i!mlfp3zuzl3vb)*g%d)(=x=e5(%'
+SECRET_KEY = 'django-insecure-5wcf04*y&w!@@yp3$#1cg)u(f)80vdo*8_2-!8*1d-l!&gsa0@'
 
-# SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
 ALLOWED_HOSTS = []
 
 
 # Application definition
+
+#jwt
+JWT_SETTINGS = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(hours=24),
+    'REFRESH_TOKEN_LIFETIME': timedelta(hours=24),
+    'ROTATE_REFRESH_TOKENS': True,
+    'BLACKLIST_AFTER_ROTATION': True,
+    'ALGORITHM': 'HS256',
+    'SIGNING_KEY': SECRET_KEY,
+    'VERIFYING_KEY': None,
+    'AUDIENCE': None,
+    'ISSUER': None,
+    'AUTH_HEADER_TYPES': ('Bearer',),
+    'AUTH_HEADER_NAME': 'HTTP_AUTHORIZATION',
+    'USER_ID_FIELD': 'id',
+    'USER_ID_CLAIM': 'user_id',
+    'AUTH_TOKEN_CLASSES': ('rest_framework_simplejwt.tokens.AccessToken',),
+    'TOKEN_TYPE_CLAIM': 'token_type',
+    'JTI_CLAIM': 'jti',
+}
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -52,6 +73,13 @@ TEMPLATES = [
     },
 ]
 
+#backend from authentication for use jwt
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    ),
+}
+
 WSGI_APPLICATION = 'tasksGoogleCalendar.wsgi.application'
 
 
@@ -63,6 +91,8 @@ DATABASES = {
     }
 }
 
+#auth user model
+AUTH_USER_MODEL = 'tasks.User'
 
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [
