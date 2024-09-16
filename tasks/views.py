@@ -5,7 +5,7 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from django.contrib.auth import get_user_model
 from datetime import datetime, timedelta
-from .models import OAUTHToken
+from .models import OAUTHToken, Task
 import pytz
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.decorators import api_view, permission_classes
@@ -69,7 +69,6 @@ class Login(APIView):
             return Response({'message': 'An error occurred in the login process'}, status=status.HTTP_400_BAD_REQUEST)
 
 
-#alterar a mensagem de view protected
 @permission_classes([IsAuthenticated])
 @api_view(['POST'])
 def Create(request):
@@ -97,9 +96,13 @@ def Create(request):
 
     #is it an all-day event?
     if event.get('full_day') == True:
+        start_hour = None
+        end_hour = None
         start = event.get('start_date')
         end = event.get('end_date')
     else:
+        start_hour = event.get('start_hour')
+        end_hour = event.get('end_hour')
         start = f'{event.get('start_date')}T{event.get('start_hour')}-03:00'
         end = f'{event.get('end_date')}T{event.get('end_hour')}-03:00'
     
@@ -110,7 +113,7 @@ def Create(request):
         recurrence = None
 
     #set up the event based on the request
-    event = {
+    event_format = {
         'summary': event.get('title'),
         'location': event.get('locale'),
         'description': event.get('description'),
@@ -132,12 +135,27 @@ def Create(request):
         ],
     }
 
-    #create the event on google calendar
     try:
-        result = service.events().insert(calendarId='primary', body=event).execute()
+        #create the event on google calendar
+        result = service.events().insert(calendarId='primary', body=event_format).execute()
 
-        ############# Criar o evendo no db #############
+        #create object in db
+        Task.objects.create(
+            id = result.get('id'),
+            title = event.get('title'),
+            locale = event.get('locale'),
+            full_day = event.get('full_day'),
+            description = event.get('description'),
+            start_date = event.get('start_date'),
+            start_hour = start_hour,
+            end_date = event.get('end_date'),
+            end_hour = end_hour,
+            participants = event.get('participants'),
+            reminders = event.get('reminders'),
+            appellant = event.get('appellant'),
+            recurrence = recurrence
+        )
 
-        return Response({'message': 'Event created successfully!', 'link': result.get('htmlLink')})
+        return Response({'message': 'Event created successfully!', 'link': result.get('htmlLink')}, status=status.HTTP_200_OK)
     except Exception as e:
-        return Response({'message': f'Error creating event: {e}'})
+        return Response({'message': f'Error creating event: {e}'}, status=status.HTTP_400_BAD_REQUEST)
