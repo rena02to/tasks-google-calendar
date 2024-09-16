@@ -10,7 +10,7 @@ import pytz
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework_simplejwt.tokens import RefreshToken
-from .serializers import OAUTHTokenSerializer
+from .serializers import OAUTHTokenSerializer, TaskSerializer
 from google.oauth2.credentials import Credentials
 
 User = get_user_model()
@@ -142,6 +142,7 @@ def Create(request):
         #create object in db
         Task.objects.create(
             id = result.get('id'),
+            user = user,
             title = event.get('title'),
             locale = event.get('locale'),
             full_day = event.get('full_day'),
@@ -159,3 +160,37 @@ def Create(request):
         return Response({'message': 'Event created successfully!', 'link': result.get('htmlLink')}, status=status.HTTP_200_OK)
     except Exception as e:
         return Response({'message': f'Error creating event: {e}'}, status=status.HTTP_400_BAD_REQUEST)
+
+
+
+#views that retrieve scheduled events do not retrieve all events
+#from the user's calendar, only those created by the application
+@permission_classes([IsAuthenticated])
+@api_view(['GET'])
+def GetAllTasks(request):
+    #search for all tasks belonging to the user making the request
+    tasks = Task.objects.filter(user=request.user)
+    tasks = TaskSerializer(tasks, many=True).data
+    return Response(tasks)
+
+
+@permission_classes([IsAuthenticated])
+@api_view(['GET'])
+def GetTask(request):
+    pass
+
+
+@permission_classes([IsAuthenticated])
+@api_view(['POST'])
+def UpdateTask(request):
+    pass
+
+@permission_classes([IsAuthenticated])
+@api_view(['POST'])
+def DeleteTask(request):
+    pass
+
+@permission_classes([IsAuthenticated])
+@api_view(['GET'])
+def SearchTasks(request):
+    pass

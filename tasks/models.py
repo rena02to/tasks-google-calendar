@@ -17,6 +17,7 @@ class User(AbstractUser):
         return self.email
 
 class Task(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
     id = models.CharField(max_length=255, primary_key=True)
     title = models.CharField(max_length=75)
     description = models.TextField()
@@ -35,7 +36,7 @@ class Task(models.Model):
 
 
     def __str__(self):
-        return self.title
+        return f'{self.title} from {self.user.email}'
     
 class OAUTHToken(models.Model):
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
