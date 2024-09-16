@@ -162,7 +162,6 @@ def Create(request):
         return Response({'message': f'Error creating event: {e}'}, status=status.HTTP_400_BAD_REQUEST)
 
 
-
 #views that retrieve scheduled events do not retrieve all events
 #from the user's calendar, only those created by the application
 @permission_classes([IsAuthenticated])
@@ -171,26 +170,44 @@ def GetAllTasks(request):
     #search for all tasks belonging to the user making the request
     tasks = Task.objects.filter(user=request.user)
     tasks = TaskSerializer(tasks, many=True).data
-    return Response(tasks)
+    if tasks:
+        return Response(tasks, status=status.HTTP_200_OK)
+    else:
+        return Response({'message': 'User has no registered tasks'}, status=status.HTTP_200_OK)
 
 
 @permission_classes([IsAuthenticated])
 @api_view(['GET'])
 def GetTask(request):
+    try:
+        #search the task by id
+        task = Task.objects.get(id=request.data.get('id'))
+        task = TaskSerializer(task).data
+
+        #checks if the user requesting to view an event is the owner
+        if task.get('user') != request.user.id:
+            return Response({'message': 'The user does not have permission to view this task'}, status=status.HTTP_401_UNAUTHORIZED)
+        elif task:
+            return Response(task, status=status.HTTP_200_OK)
+    except:
+        return Response({'message': 'This task does not exist or an error occurred in the request'}, status=status.HTTP_200_OK)
+
+
+@permission_classes([IsAuthenticated])
+@api_view(['GET'])
+def SearchTasks(request):
     pass
 
 
+#the update view, and delete view does not update the event if it
+#is not created by the application
 @permission_classes([IsAuthenticated])
 @api_view(['POST'])
 def UpdateTask(request):
     pass
 
+
 @permission_classes([IsAuthenticated])
 @api_view(['POST'])
 def DeleteTask(request):
-    pass
-
-@permission_classes([IsAuthenticated])
-@api_view(['GET'])
-def SearchTasks(request):
     pass
