@@ -94,48 +94,41 @@ def Create(request):
     #create the service to interact with the Google Calendar API
     service = build('calendar', 'v3', credentials=creds)
 
-    #is it an all-day event?
-    if event.get('full_day') == True:
-        name = 'date'
-        start_hour = None
-        end_hour = None
-        start = f'{event.get('start_date')}'
-        end = f'{event.get('end_date')}'
-    else:
-        name = 'dateTime'
-        start_hour = event.get('start_hour')
-        end_hour = event.get('end_hour')
-        start = f'{event.get('start_date')}T{event.get('start_hour')}-03:00'
-        end = f'{event.get('end_date')}T{event.get('end_hour')}-03:00'
-    
-    #is it recurring?
-    if event.get('appellant') == True:
-        recurrence = event.get('recurrence')
-    else:
-        recurrence = None
-
     #set up the event based on the request
     event_format = {
         'summary': event.get('title'),
         'location': event.get('locale'),
         'description': event.get('description'),
         'start': {
-            name: start,
             'timeZone': 'America/Sao_Paulo',
         },
         'end': {
-            name: end,
             'timeZone': 'America/Sao_Paulo',
         },
         'attendees': event.get('participants'),
         'reminders': {
             'useDefault': False,
             'overrides': event.get('reminders'),
-        },
-        'recurrence': [
-            recurrence
-        ],
+        }
     }
+
+    #is it an all-day event?
+    if event.get('full_day') == True:
+        event_format['start']['date'] = event.get('start_date')
+        event_format['end']['date'] = event.get('end_date')
+
+        start_hour = None
+        end_hour = None
+    else:
+        event_format['start']['dateTime'] = f'{event.get('start_date')}T{event.get('start_hour')}-03:00'
+        event_format['end']['dateTime'] = f'{event.get('end_date')}T{event.get('end_hour')}-03:00'
+
+        start_hour = event.get('start_hour')
+        end_hour = event.get('end_hour')
+    
+    #is it recurring?
+    if event.get('appellant') == True:
+        event_format['recurrence'] = [event.get('recurrence')]
 
     try:
         #create the event on google calendar
@@ -156,7 +149,7 @@ def Create(request):
             participants = event.get('participants'),
             reminders = event.get('reminders'),
             appellant = event.get('appellant'),
-            recurrence = recurrence
+            recurrence = event.get('recurrence')
         )
 
         return Response({'message': 'Event created successfully!', 'link': result.get('htmlLink')}, status=status.HTTP_200_OK)
@@ -281,6 +274,209 @@ def Delete(request):
 #the update view, and delete view does not update the event if it
 #is not created by the application
 @permission_classes([IsAuthenticated])
-@api_view(['POST'])
+@api_view(['PATCH'])
 def Update(request):
-    pass
+    #retrieves data from the request
+    user = request.user
+    event = request.data
+
+    try:
+        #retrieves data from the database
+        event_db = Task.objects.get(id=event.get('idTask'))
+        event_db_info = TaskSerializer(event_db).data
+
+        #user has permission to edit?
+        if user.id == event_db_info.get('user'):
+            event_format = {}
+            
+            #is there an edit in the title?
+            if event.get('title'):
+                event_db.title = event.get('title')
+                event_format['summary'] = event.get('title')
+
+            #is there an on-site edition?
+            if event.get('locale'):
+                event_db.locale = event.get('locale')
+                event_format['locale'] = event.get('locale')
+
+            #is there an edit in the description?
+            if event.get('description'):
+                event_db.description = event.get('description')
+                event_format['description'] = event.get('description')
+
+            #will the event be changed to an all-day event?
+            if event.get('full_day') == True:
+                event_db.full_day = event.get('full_day')
+                #if there is a new start date in the request, edit
+                if event.get('start_date'):
+                    event_db.start_date = event.get('start_date')
+                    event_format['start'] = {}
+                    event_format['start']['timeZone'] = 'America/Sao_Paulo'
+                    event_format['start']['date'] = event.get('start_date')
+                
+                #if there is a new end date in the request, edit
+                if event.get('end_date'):
+                    event_db.end_date = event.get('end_date')
+                    event_format['start'] = {}
+                    event_format['end']['timeZone'] = 'America/Sao_Paulo'
+                    event_format['end']['date'] = event.get('end_date')
+                
+                #otherwise there is a new start or end date, take the one in the db
+                if event.get('end_date') == None and event.get('start_date') == None:
+                    start_date = event_db_info.get('start_date')
+                    end_date = event_db_info.get('end_date')
+                    event_format['start'] = {}
+                    event_format['start']['timeZone'] = 'America/Sao_Paulo'
+                    event_format['start']['date'] = start_date
+                    event_format['end'] = {}
+                    event_format['end']['timeZone'] = 'America/Sao_Paulo'
+                    event_format['end']['date'] = end_date
+
+            #will the event no longer be all day long?
+            elif event.get('full_day') == False:
+                event_db.full_day = event.get('full_day')
+                #if there is a new start date, store it in a variable
+                if event.get('start_date'):
+                    event_db.start_date = event.get('start_date')
+                    start_date = event.get('start_date')
+                
+                #if there is a new end date, store it in a variable
+                if event.get('end_date'):
+                    event_db.end_date = event.get('end_date')
+                    end_date = event.get('end_date')
+
+                #if there is no end or start date, the dates will be those of the db
+                if event.get('end_date') == None and event.get('start_date') == None:
+                    start_date = event_db_info.get('start_date')
+                    end_date = event_db_info.get('end_date')
+                
+                #if there is a new start time, store it in a variable
+                if event.get('start_hour'):
+                    event_db.start_hour = event.get('start_hour')
+                    start_hour = event.get('start_hour')
+
+                #if there is a new end date, store it in a variable
+                if event.get('end_date'):
+                    event_db.end_date = event.get('end_date')
+                    end_hour = event.get('end_hour')
+
+                #if there is no new start or end date, it will be set as a default start at 09:00 and end at 10:00
+                if event.get('end_date') == None and event.get('start_hour') == None:
+                    start_hour = '09:00:00'
+                    end_hour = '10:00:00'
+                
+                #format in the format accepted by Google calendar
+                event_format['start'] = {}
+                event_format['start']['timeZone'] = 'America/Sao_Paulo'
+                event_format['start']['dateTime'] = f'{start_date}T{start_hour}-03:00'
+                event_format['end'] = {}
+                event_format['end']['timeZone'] = 'America/Sao_Paulo'
+                event_format['end']['dateTime'] = f'{end_date}T{end_hour}-03:00'
+
+            #want to add a new participant?
+            if event.get('participants_add'):
+                #db participants
+                participants = event_db_info.get('participants')
+                existing_emails = {p['email'] for p in participants}
+                #search if the participant already exists in the db
+                for participant in event.get('participants_add'):
+                    #if the participant does not exist, insert
+                    if participant['email'] not in existing_emails:
+                        participants.append(participant)
+                event_db.participants = event.get('participants')
+                #format in the format accepted by Google Calendar
+                event_format['attendees'] = participants
+
+            #want to delete a participant?
+            if event.get('participants_del'):
+                participants = event_db_info.get('participants')
+                #if the participant exists, delete it
+                if event.get('participants_del') in participants:
+                    participants.remove(event.get('participants_del'))
+                event_db.participants = event.get('participants')
+                #format in the format accepted by Google Calendar
+                event_format['attendees'] = participants
+
+
+            #Do you want to edit any notifications?
+            if event.get('reminders_edit'):
+                #db notifications
+                reminders = event_db_info.get('reminders')
+                for new_reminder in event.get('reminders_edit'):
+                    # Remove any reminder with the same 'method' as the request
+                    reminders = [r for r in reminders if r['method'] != new_reminder['method']]
+                    # Add the new reminder
+                    reminders.append(new_reminder)
+                event_db.reminders = event.get('reminders')
+                #format in the format that Google Calendar accepts
+                event_format['reminders'] = {}
+                event_format['reminders']['useDefault'] = False
+                event_format['reminders']['overrides'] = reminders
+
+            #Do you want to delete any notifications?
+            if event.get('reminders_del'):
+                #notificações do db
+                reminders = event_db_info.get('reminders')
+                #if the notification exists, delete it
+                reminders = [r for r in reminders if r['method'] != event.get('reminders_del')]
+                #format in the format accepted by Google Calendar
+                event_db.reminders = event.get('reminders')
+                event_format['reminders'] = {}
+                event_format['reminders']['useDefault'] = False
+                event_format['reminders']['overrides'] = reminders
+
+            #want to add some notification?
+            if event.get('reminders_add'):
+                #db notifications
+                reminders = event_db_info.get('reminders')
+                #if the notification does not exist, insert
+                for reminder_to_add in event.get('reminders_add'):
+                    if not any(r['method'] == reminder_to_add['method'] for r in reminders):
+                        reminders.append(reminder_to_add)
+                        #format in the format accepted by Google Calendar
+                event_db.reminders = event.get('reminders')
+                event_format['reminders'] = {}
+                event_format['reminders']['useDefault'] = False
+                event_format['reminders']['overrides'] = reminders
+
+
+            #want to change it to a non-recurring event?
+            if event.get('appellant') and event.get('appellant') == False:
+                event_db.appellant = False
+                #remove the recurrence
+                event_format['recurrence'] = []
+            
+            #want to change it to a recurring event?
+            if event.get('appellant') and event.get('appellant') == True:
+                event_db.appellant = True
+                #define a recorrência
+                event_format['recurrence'] = [event.get('appellant')]
+
+
+            token = OAUTHToken.objects.get(user=user)
+            #use the serializer to leave it in the correct format
+            oauth_token = OAUTHTokenSerializer(token).data
+            
+            #from the db data, assemble the credentials to use in the Google Calendar request
+            creds = Credentials(
+                token = oauth_token.get("access_token"),
+                refresh_token = oauth_token.get("refresh_token"),
+                token_uri=oauth_token.get('token_uri'),
+                client_id=oauth_token.get("client_id"),
+                client_secret=oauth_token.get("client_secret"),
+                scopes=oauth_token.get("scopes").split(','),
+            )
+
+            #define the service and credentials
+            service = build('calendar', 'v3', credentials=creds)
+
+            try:
+                #update event
+                result = service.events().patch(calendarId='primary', eventId=event.get('idTask'), body=event_format).execute()
+                return Response({'message': 'Event edited successfully!', 'link': result.get('htmlLink')}, status=status.HTTP_200_OK)
+            except:
+                return Response({'message': 'An error occurred while editing the event'}, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            return Response({'message': 'The user does not have permission to edit this task'}, status=status.HTTP_401_UNAUTHORIZED)
+    except:
+        return Response({'message': "The event does not exist or an error occurred in the request"}, status=status.HTTP_400_BAD_REQUEST)
