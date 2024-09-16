@@ -195,19 +195,60 @@ def GetTask(request):
 
 @permission_classes([IsAuthenticated])
 @api_view(['GET'])
-def SearchTasks(request):
-    pass
+def Search(request):
+    #recovers all user events
+    tasks = tasks.filter(user=request.user)
+
+    #transforms the request url filters into a dictionary
+    filters = request.GET.dict()
+
+    #separate filters individually
+    query = filters.get('q')
+    date_start = filters.get('date_start')
+    date_end = filters.get('date_end')
+    locale = filters.get('locale')
+    participants = filters.get('participants')
+    
+    #filter by search string, if any
+    if query:
+        tasks = tasks.filter(title__icontains=query)
+    
+    #filter by the event start date, if any
+    if date_start:
+        interval_start_date = date_start.split('|')[0]
+        interval_end_date = date_start.split('|')[1]
+        tasks = tasks.filter(start_date__range=(interval_start_date, interval_end_date))
+    
+    #filter by the event end date, if any
+    if date_end:
+        interval_start_date = date_end.split('|')[0]
+        interval_end_date = date_end.split('|')[1]
+        tasks = tasks.filter(end_date__range=(interval_start_date, interval_end_date))
+
+    #filter by location (location is a string, which can be the address), if it exists
+    if locale:
+        tasks = tasks.filter(locale__icontains=locale)
+
+    #filter by participants’ email, if any
+    if participants:
+        tasks = [task for task in tasks if any(participants in participant.get('email', '') for participant in task.participants)]
+
+    if tasks:
+        tasks = TaskSerializer(tasks, many=True).data
+        return Response(tasks, status=status.HTTP_200_OK)
+    else:
+        return Response({'message': 'User has no registered tasks'}, status=status.HTTP_200_OK)
 
 
 #the update view, and delete view does not update the event if it
 #is not created by the application
 @permission_classes([IsAuthenticated])
 @api_view(['POST'])
-def UpdateTask(request):
+def Update(request):
     pass
 
 
 @permission_classes([IsAuthenticated])
 @api_view(['POST'])
-def DeleteTask(request):
+def Delete(request):
     pass
