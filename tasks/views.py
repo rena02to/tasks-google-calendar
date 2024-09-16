@@ -96,11 +96,13 @@ def Create(request):
 
     #is it an all-day event?
     if event.get('full_day') == True:
+        name = 'date'
         start_hour = None
         end_hour = None
-        start = event.get('start_date')
-        end = event.get('end_date')
+        start = f'{event.get('start_date')}'
+        end = f'{event.get('end_date')}'
     else:
+        name = 'dateTime'
         start_hour = event.get('start_hour')
         end_hour = event.get('end_hour')
         start = f'{event.get('start_date')}T{event.get('start_hour')}-03:00'
@@ -118,11 +120,11 @@ def Create(request):
         'location': event.get('locale'),
         'description': event.get('description'),
         'start': {
-            'dateTime': start,
+            name: start,
             'timeZone': 'America/Sao_Paulo',
         },
         'end': {
-            'dateTime': end,
+            name: end,
             'timeZone': 'America/Sao_Paulo',
         },
         'attendees': event.get('participants'),
@@ -197,6 +199,7 @@ def GetTask(request):
 @api_view(['GET'])
 def Search(request):
     #recovers all user events
+    tasks = Task.objects.all()
     tasks = tasks.filter(user=request.user)
 
     #transforms the request url filters into a dictionary
@@ -240,15 +243,44 @@ def Search(request):
         return Response({'message': 'User has no registered tasks'}, status=status.HTTP_200_OK)
 
 
+@permission_classes([IsAuthenticated])
+@api_view(['DELETE'])
+def Delete(request):
+    #check the existence of the event
+    try:
+        event = Task.objects.get(id=request.data.get('eventId'))
+        event = TaskSerializer(event).data
+
+        #if the event exists, check if the user has permission to delete it
+        if event.get('user') != request.user.id:
+            return Response({'message': "User does not have permission to delete the event"}, status=status.HTTP_401_UNAUTHORIZED)
+        else:
+            #if the user has permission to delete, redeem the Google Calendar token
+            token = OAUTHToken.objects.get(user=request.user)
+            token = OAUTHTokenSerializer(token).data.get('access_token')
+
+            #create credentials from the token
+            creds = Credentials(token=token)
+            service = build('calendar', 'v3', credentials=creds)
+
+            try:
+                #delete the event from Google Calendar
+                service.events().delete(calendarId='primary', eventId=request.data.get('eventId'), sendUpdates=request.data.get('sendUpdates')).execute()
+
+                #exclude the event from the db
+                Task.objects.get(id=request.data.get('eventId')).delete()
+
+                #in the front end there should be a security question to check if the user really wants to delete the event
+                return Response({'message': "The event was successfully deleted!"}, status=status.HTTP_200_OK)
+            except:
+                return Response({'message': "An error occurred when trying to delete the event"}, status=status.HTTP_400_BAD_REQUEST)
+    except:
+        return Response({'message': "The event does not exist or an error occurred in the request"}, status=status.HTTP_400_BAD_REQUEST)
+
+
 #the update view, and delete view does not update the event if it
 #is not created by the application
 @permission_classes([IsAuthenticated])
 @api_view(['POST'])
 def Update(request):
-    pass
-
-
-@permission_classes([IsAuthenticated])
-@api_view(['POST'])
-def Delete(request):
     pass
