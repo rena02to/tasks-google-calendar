@@ -63,8 +63,8 @@ class Login(APIView):
             token = str(token.access_token)
 
             return Response({'message': 'Login successful', 'Access token': token}, status=status.HTTP_200_OK)
-        except:
-            return Response({'message': 'An error occurred in the login process'}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({'message': f'An error occurred in the login process: {e}'}, status=status.HTTP_400_BAD_REQUEST)
 
 
 @permission_classes([IsAuthenticated])
@@ -190,8 +190,8 @@ def GetTask(request):
             return Response({'message': 'The user does not have permission to view this task'}, status=status.HTTP_401_UNAUTHORIZED)
         elif task:
             return Response(task, status=status.HTTP_200_OK)
-    except:
-        return Response({'message': 'This task does not exist or an error occurred in the request'}, status=status.HTTP_200_OK)
+    except Exception as e:
+        return Response({'message': f'This task does not exist or an error occurred in the request: {e}'}, status=status.HTTP_200_OK)
 
 
 @permission_classes([IsAuthenticated])
@@ -273,8 +273,8 @@ def Delete(request):
                 return Response({'message': "The event was successfully deleted!"}, status=status.HTTP_200_OK)
             except:
                 return Response({'message': "An error occurred when trying to delete the event"}, status=status.HTTP_400_BAD_REQUEST)
-    except:
-        return Response({'message': "The event does not exist or an error occurred in the request"}, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        return Response({'message': f"The event does not exist or an error occurred in the request: {e}"}, status=status.HTTP_400_BAD_REQUEST)
 
 
 #the update view, and delete view does not update the event if it
@@ -478,9 +478,9 @@ def Update(request):
                 result = service.events().patch(calendarId='primary', eventId=event.get('id'), body=event_format).execute()
                 event_db.save()
                 return Response({'message': 'Event edited successfully!', 'link': result.get('htmlLink')}, status=status.HTTP_200_OK)
-            except:
-                return Response({'message': 'An error occurred while editing the event'}, status=status.HTTP_400_BAD_REQUEST)
+            except Exception as e:
+                return Response({'message': f'An error occurred while editing the event {e}'}, status=status.HTTP_400_BAD_REQUEST)
         else:
             return Response({'message': 'The user does not have permission to edit this task'}, status=status.HTTP_401_UNAUTHORIZED)
-    except:
-        return Response({'message': "The event does not exist or an error occurred in the request"}, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        return Response({'message': f"The event does not exist or an error occurred in the request: {e}"}, status=status.HTTP_400_BAD_REQUEST)
