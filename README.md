@@ -9,7 +9,7 @@ Neste projeto a tarefa pode ser:
 - Editada
 - Deletada
 
-Considerando que no escopo do projeto ficou definido que o projeto será executado somente localmente, não usaremos autenticação e autorização como sugere o guia fornacido pela Google em seu [Guia de início rápido](https://developers.google.com/calendar/api/quickstart/python?hl=pt-br), a autenticação será baseada no JWT e no token gerado pela api do Google Calendar para cada usuário.
+Considerando que no escopo do projeto ficou definido que o projeto será executado somente localmente, não usaremos autenticação e autorização como sugere o guia fornecido pelo Google em seu [Guia de início rápido](https://developers.google.com/calendar/api/quickstart/python?hl=pt-br), a autenticação será baseada no JWT e no token gerado pela api do Google Calendar, que é um token único para cada usuário.
 
 ## Stack utilizada
 
@@ -123,17 +123,17 @@ Como definição de projeto, todas as requisições seram feitas por meio de apl
 ```http
   POST /api/login
 ```
-Abre o navegador para que seja realizado o processo de autenticação com a conta do Google. Retorna o status, uma mensagem com o status da solicitação e um token de acesso que deverá ser usado nas requisições feitas para views protegidas (no nosso caso, todas as views exceto a de login são protegidas).
+Abre o navegador para que seja realizado o processo de autenticação com a conta do Google. Caso o processo seja bem sucedido, retorna o status e um token de acesso que deverá ser usado nas requisições feitas para views protegidas (no nosso caso, todas as views exceto a de login são protegidas).
 
 Para fazer login com uma conta diferente, basta realizar uma nova requisição para a mesma URL e salvar o token gerado. Assim, se quiser alternar entre contas, é necessário apenas utilizar o token correspondente à conta desejada ao realizar futuras requisições.
 
-Em todas as URLs a seguir, na área de Authorization **DEVERÁ** ser selecionado Bearer Token e o token retornado no processo de login deverá ser colocado, pois esse é o processo de autenticação da aplicação, sem isso será retornado o erro `401`, que se acesso não autorizado.
+Em todas as URLs a seguir, na área de Authorization **DEVERÁ** ser selecionado Bearer Token e o token retornado no processo de login deverá ser colocado, pois esse é o processo de autenticação da aplicação, sem isso será retornado o erro `401_UNAUTHORIZED`, que se refere a um erro de acesso não autorizado.
 
 #### Cria um evento
 ```http
   POST /api/create/
 ```
-Nessa URL, na seção de `body` será necessário selecionar JSON colocar o seguinte formato de conteúdo, no qual **nenhum campo poderá ser omitido, podendo alguns deles ser nulos, os quais devem ser representados por uma string vazia** ```("campo": "")```. Caso o evento seja criado com sucesso será retornado o status, uma mensagem com o status, o id da task e o link para ela no Google Agenda, caso ocorra um erro, será exibido o erro.
+Nessa URL, na seção de `body` será necessário selecionar JSON colocar o seguinte formato de conteúdo, no qual **nenhum campo poderá ser omitido, podendo alguns deles ser nulos, os quais devem ser representados por uma string vazia** ```("campo": "")```. Caso o evento seja criado com sucesso será retornado o status, o id da task e o link para ela no Google Agenda, caso ocorra um erro, será exibido o erro.
 
 Segue o formato:
 ```json
@@ -158,14 +158,14 @@ Segue descrição de como deve ser cada um dos valores
 | `title`      | `string` | O título do evento que você deseja criar (**`Obrigatório`**)|
 | `description`      | `string` | A descrição do evento que você deseja criar (**`Anulável`**) |
 | `locale`      | `string` | O local onde irá ocorrer o evento (**`Anulável`**) |
-| `full_day`      | `boolean` | Se o evento é um evento que dura o dia todo, ou não. Caso o evento dure o dia todo, "full_day": True, caso contrário, "full_day": False (**`Obrigatório`**) |
+| `full_day`      | `boolean` | Se o evento é um evento que dura o dia todo, ou não. Caso o evento dure o dia todo, `"full_day": True`, caso contrário, `"full_day": False` (**`Obrigatório`**) |
 | `start_date`      | `string` | A data de início do evento. **Deve ter o formato AAAA-MM-DD** no qual AAAA é o ano com 4 dígitos, MM é o mês com 2 dígitos, DD o dia com 2 digitos. Por exemplo, 02 de março de 2024 deverá ficar no seguinte formato 2024-03-02 (**`Obrigatório`**) |
 | `start_hour`      | `string` | Hora que o evento irá começar. **Deve ter o formato HH:MM:SS** no qual HH são as horas, MM os minutos e SS os segundos. Por exemplo, um evento que comecará às 09 horas, 30 minutos e 50 segundos deverá ficar no seguinte formato 09:30:00 (**`Anulável somente se "full_day": False`**, se esse campo for omitido, será definido o valor padrão para início do evento, que é 09:00:00)|
 | `end_date`      | `string` | A data de término do evento. **Deve ter o formato AAAA-MM-DD** no qual AAAA é o ano com 4 dígitos, MM é o mês com 2 dígitos, DD o dia com 2 digitos. Por exemplo, 02 de março de 2024 deverá ficar no seguinte formato 2024-03-02 (**`Obrigatório`**)  |
 | `end_hour`      | `string` | Hora que o evento irá terminar. **Deve ter o formato HH:MM:SS** no qual HH são as horas, MM os minutos e SS os segundos. Por exemplo, um evento que terminará às 11 horas deverá ficar no seguinte formato 11:00:00 (**`Anulável somente se "full_day": False`**, se esse campo for omitido, será definido o valor padrão para término do evento, que é 10:00:00 |
-| `participants`      | `array` | Os participantes que você deseja adicionar no evento. **Deverá ter o formato: `"participants": [{"email": "participante1@email.com"}, {"email": "participante2@email.com"}]`**, no qual cada e-mail se refere ao e-mail de um participante. (**`Anulável`**) |
+| `participants`      | `array` | Os participantes que você deseja adicionar no evento. **Deverá ter o formato: `"participants": ["participante1@email.com", "participante2@email.com"]`**, no qual cada e-mail se refere ao e-mail de um participante. (**`Anulável`**) |
 | `reminders`      | `array` | Os métodos pelo qual você deseja receber as notificações sobre o evento. **Deverá ter o seguinte formato: `"reminders": [{"method": string, "minutes": int}, {"method": string, "minutes": int}]`**, no qual a string que corresponde ao `method` pode ser o valor `"email"` ou `"popup"`, e o valor inteiro que corresponde a `minutes` é o número de minutos antes do evento que o você será avisado. (`Anulável`) |
-| `appellant`      | `array` | Se o evento é recorrente. iso é, se o evento acontece mais de uma vez ou se é somente no dia definido. |
+| `appellant`      | `boolean` | Se o evento é recorrente. Isto é, se o evento acontece mais de uma vez ou se é somente no dia definido. Se for recorrente `"appellant": True`, senão `"appellant": False`|
 | `recurrence`      | `string` | A string de recorrência do evento. Essa string representa a recorrência do evento. A string se divide em algumas partes que estarão explicadas na tabela abaixo.
 
 Tabela de definição da string de recorrência
@@ -285,7 +285,7 @@ Segue o exemplo de `body`:
 ```http
   PATCH /api/update/
 ```
-Nessa URL, na seção de `body` será necessário selecionar JSON e colocar o seguinte formato de conteúdo, no qual a string referente à id deverá ser o id do evento a ser atualizado e os campos que deseja atualizar, juntamente com os valores a serem inseridos (só é necessário passar os valores que deseja atualizar). Caso a atualização seja feita com sucesso, será exibida uma mensagem de sucesso, caso não ser´´a exibido o erro.
+Nessa URL, na seção de `body` será necessário selecionar JSON e colocar o seguinte formato de conteúdo, no qual a string referente à id deverá ser o id do evento a ser atualizado e os campos que deseja atualizar, juntamente com os valores a serem inseridos (só é necessário passar os valores que deseja atualizar). Caso a atualização seja feita com sucesso, será exibida uma mensagem de sucesso, caso não será exibido o erro.
 
 Segue um exemplo de `body`:
 ```json
@@ -295,7 +295,7 @@ Segue um exemplo de `body`:
 }
 ```
 
-Todos os campos da tabela de criação podem ser passados da mesma forma exceto `participants` e `reminders`. Segue a explicação de cada um:
+Todos os campos da tabela de criação podem ser passados da mesma forma que são passados na criação de um evento, **EXCETO** `participants` e `reminders`. Segue a explicação de cada um:
 
 | Parâmetro   | Tipo       | Descrição                                   |
 | :---------- | :--------- | :------------------------------------------ |
@@ -329,7 +329,7 @@ Exemplos:
 ```http
   GET /api/search?...<parametros>/
 ```
-Nessa URL será necessário enviar, na própia URL, os seguinte parâmetros, os quais não são obrigatórios, mas no caso da busca ser realizada com base em mais de um parâmetro deve-se usaro separados `&`. Caso a solicitação seja feita com sucesso, serão exibidos os eventos que correspondem à sua busca, caso contrário, será exibida uma mensagem de erro:
+Nessa URL será necessário enviar, na própia URL, os seguinte parâmetros, os quais não são obrigatórios, mas no caso da busca ser realizada com base em mais de um parâmetro deve-se usaro separados `&`. Caso a solicitação seja feita com sucesso, serão exibidos os eventos que correspondem à sua busca, e que pertencem ao usuário atual, caso contrário, será exibida uma mensagem de erro:
 
 Segue a tabela com os possíveis parâmetros.
 
@@ -337,18 +337,18 @@ Segue a tabela com os possíveis parâmetros.
 | Parâmetro   | Descrição                                   | Formato |
 | :---------- | :--------- | :------------------------------------------ |
 | `q`      | String que você deseja pesquisar no título de um evento | `string` |
-| `date_start`      | Intervalo no qual você deseja buscar a data de início do evento | `data_inicial_do_intervalo\|data_final_do_intervalo`
-| `date_end`      | String que você deseja pesquisar no título de um evento | Intervalo no qual você deseja buscar a data de término do evento | `data_inicial_do_intervalo\|data_final_do_intervalo` |
+| `date_start`      | Intervalo no qual você deseja buscar a data de início do evento, caso queira buscar um dia específico, as datas devem ser iguais | `data_inicial_do_intervalo\|data_final_do_intervalo`
+| `date_end`     | Intervalo no qual você deseja buscar a data de término do evento, caso queira buscar um dia específico, as datas devem ser iguais | `data_inicial_do_intervalo\|data_final_do_intervalo` |
 | `locale`      | String que você deseja pesquisar no local de um evento | `string` |
 | `participants`      | String que você deseja pesquisar nos participantes de um evento | `string` |
 
 Exemplos:
-- Suponha que você queira buscar um evento que tenha `cinema` no título, que se inicie no dia 17 de novembro de 2024, que tenha `Shopping` no local, e que tenha como participante `esposa`. Você terá algo como:
+- Suponha que você queira buscar um evento que tenha `cinema` no título, que se inicie no dia `17 de novembro de 2024`, que tenha `Shopping` no local, e que tenha como participante `esposa`. Você terá algo como:
 ```http
   GET /api/search?q=cinema&date_start=2024-11-17|2024-11-17&locale=shopping&participants=esposa/
 ```
 
-- Suponha que você queira buscar um evento que tenha `aula` no título, que se termine entre dia 5 de setembro de 2024 e 18 de novembro de 2025, que tenha `online` no local. Você terá algo como:
+- Suponha que você queira buscar um evento que tenha `aula` no título, que se termine entre dia `5 de setembro de 2024` e `18 de novembro de 2025`, que tenha `online` no local. Você terá algo como:
 ```http
   GET /api/search?q=aula&date_start=2024-09-05|2025-11-18&locale=online/
 ```
