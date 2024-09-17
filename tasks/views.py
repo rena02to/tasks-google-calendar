@@ -23,9 +23,7 @@ class Login(APIView):
         flow = InstalledAppFlow.from_client_secrets_file("credentials.json", SCOPES)
 
         try:
-            #cria o serviço para interagir com a API do Google Calendar
-
-            ##############     trocar a porta no último commit    ##############
+            #create the service to interact with the Google Calendar API
 
             creds = flow.run_local_server(port=54857, prompt='select_account')
             service = build('oauth2', 'v2', credentials=creds)
@@ -120,11 +118,19 @@ def Create(request):
         start_hour = None
         end_hour = None
     else:
-        event_format['start']['dateTime'] = f'{event.get('start_date')}T{event.get('start_hour')}-03:00'
-        event_format['end']['dateTime'] = f'{event.get('end_date')}T{event.get('end_hour')}-03:00'
+        if event.get('start_hour'):
+            start_hour = event.get('start_hour')
+        else:
+            start_hour = "09:00:00"
+        
+        if event.get('end_hour'):
+            end_hour = event.get('end_hour')
+        else:
+            end_hour = "10:00:00"
+        
+        event_format['start']['dateTime'] = f'{event.get('start_date')}T{start_hour}-03:00'
+        event_format['end']['dateTime'] = f'{event.get('end_date')}T{end_hour}-03:00'
 
-        start_hour = event.get('start_hour')
-        end_hour = event.get('end_hour')
     
     #is it recurring?
     if event.get('appellant') == True:
@@ -152,7 +158,7 @@ def Create(request):
             recurrence = event.get('recurrence')
         )
 
-        return Response({'message': 'Event created successfully!', 'link': result.get('htmlLink')}, status=status.HTTP_200_OK)
+        return Response({'message': 'Event created successfully!', 'id': result.get('id'), 'link': result.get('htmlLink')}, status=status.HTTP_200_OK)
     except Exception as e:
         return Response({'message': f'Error creating event: {e}'}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -241,7 +247,7 @@ def Search(request):
 def Delete(request):
     #check the existence of the event
     try:
-        event = Task.objects.get(id=request.data.get('eventId'))
+        event = Task.objects.get(id=request.data.get('id'))
         event = TaskSerializer(event).data
 
         #if the event exists, check if the user has permission to delete it
@@ -258,10 +264,10 @@ def Delete(request):
 
             try:
                 #delete the event from Google Calendar
-                service.events().delete(calendarId='primary', eventId=request.data.get('eventId'), sendUpdates=request.data.get('sendUpdates')).execute()
+                service.events().delete(calendarId='primary', eventId=request.data.get('id'), sendUpdates=request.data.get('sendUpdates')).execute()
 
                 #exclude the event from the db
-                Task.objects.get(id=request.data.get('eventId')).delete()
+                Task.objects.get(id=request.data.get('id')).delete()
 
                 #in the front end there should be a security question to check if the user really wants to delete the event
                 return Response({'message': "The event was successfully deleted!"}, status=status.HTTP_200_OK)
@@ -282,7 +288,7 @@ def Update(request):
 
     try:
         #retrieves data from the database
-        event_db = Task.objects.get(id=event.get('idTask'))
+        event_db = Task.objects.get(id=event.get('id'))
         event_db_info = TaskSerializer(event_db).data
 
         #user has permission to edit?
@@ -377,13 +383,11 @@ def Update(request):
             if event.get('participants_add'):
                 #db participants
                 participants = event_db_info.get('participants')
-                existing_emails = {p['email'] for p in participants}
                 #search if the participant already exists in the db
-                for participant in event.get('participants_add'):
-                    #if the participant does not exist, insert
-                    if participant['email'] not in existing_emails:
-                        participants.append(participant)
-                event_db.participants = event.get('participants')
+                for email in event.get('participants_add'):
+                    if email not in participants:
+                        participants.append({"email": email})
+                event_db.participants = participants
                 #format in the format accepted by Google Calendar
                 event_format['attendees'] = participants
 
@@ -391,9 +395,8 @@ def Update(request):
             if event.get('participants_del'):
                 participants = event_db_info.get('participants')
                 #if the participant exists, delete it
-                if event.get('participants_del') in participants:
-                    participants.remove(event.get('participants_del'))
-                event_db.participants = event.get('participants')
+                participants = [participant for participant in participants if participant['email'] not in event.get('participants_del')]
+                event_db.participants = participants
                 #format in the format accepted by Google Calendar
                 event_format['attendees'] = participants
 
@@ -407,7 +410,7 @@ def Update(request):
                     reminders = [r for r in reminders if r['method'] != new_reminder['method']]
                     # Add the new reminder
                     reminders.append(new_reminder)
-                event_db.reminders = event.get('reminders')
+                event_db.reminders = reminders
                 #format in the format that Google Calendar accepts
                 event_format['reminders'] = {}
                 event_format['reminders']['useDefault'] = False
@@ -418,9 +421,9 @@ def Update(request):
                 #notificações do db
                 reminders = event_db_info.get('reminders')
                 #if the notification exists, delete it
-                reminders = [r for r in reminders if r['method'] != event.get('reminders_del')]
+                reminders = [reminder for reminder in reminders if reminder['method'] not in event.get('reminders_del')]
                 #format in the format accepted by Google Calendar
-                event_db.reminders = event.get('reminders')
+                event_db.reminders = reminders
                 event_format['reminders'] = {}
                 event_format['reminders']['useDefault'] = False
                 event_format['reminders']['overrides'] = reminders
@@ -434,7 +437,7 @@ def Update(request):
                     if not any(r['method'] == reminder_to_add['method'] for r in reminders):
                         reminders.append(reminder_to_add)
                         #format in the format accepted by Google Calendar
-                event_db.reminders = event.get('reminders')
+                event_db.reminders = reminders
                 event_format['reminders'] = {}
                 event_format['reminders']['useDefault'] = False
                 event_format['reminders']['overrides'] = reminders
@@ -472,7 +475,8 @@ def Update(request):
 
             try:
                 #update event
-                result = service.events().patch(calendarId='primary', eventId=event.get('idTask'), body=event_format).execute()
+                result = service.events().patch(calendarId='primary', eventId=event.get('id'), body=event_format).execute()
+                event_db.save()
                 return Response({'message': 'Event edited successfully!', 'link': result.get('htmlLink')}, status=status.HTTP_200_OK)
             except:
                 return Response({'message': 'An error occurred while editing the event'}, status=status.HTTP_400_BAD_REQUEST)

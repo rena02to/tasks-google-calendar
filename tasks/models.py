@@ -21,7 +21,7 @@ class Task(models.Model):
     id = models.CharField(max_length=255, primary_key=True)
     title = models.CharField(max_length=75)
     description = models.TextField()
-    locale = models.CharField(max_length=255)
+    locale = models.CharField(max_length=255, null=True)
     full_day = models.BooleanField()
     start_date = models.DateField()
     start_hour = models.TimeField(null=True)
