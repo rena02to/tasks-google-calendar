@@ -108,7 +108,9 @@ python manage.py migrate
 python manage.py createsuperuser
 ```
 
-10. Rode o servidor
+11. Crie o seu arquivo `credentials.json` (deverá ter exatamente esse nome), e o coloque na raiz do projeto, junto com o arquivo `Readme.md` e `manage.py`. Você pode criar seu arquivo `credentials.json` seguinto o seguinte tutorial do Google [https://developers.google.com/workspace/guides/create-project?hl=pt-br](https://developers.google.com/workspace/guides/create-project?hl=pt-br), ou seguinto o seguinte tutorial em vídeo: [https://www.youtube.com/watch?v=Cwwd9iiMeQo&t](https://www.youtube.com/watch?v=Cwwd9iiMeQo&t).
+
+11. Rode o servidor
 ```
 python manage.py runserver
 ```
@@ -131,7 +133,7 @@ Em todas as URLs a seguir, na área de Authorization **DEVERÁ** ser selecionado
 
 #### Cria um evento
 ```http
-  POST /api/create/
+  POST /api/task/
 ```
 Nessa URL, na seção de `body` será necessário selecionar JSON colocar o seguinte formato de conteúdo, no qual **nenhum campo poderá ser omitido, podendo alguns deles ser nulos, os quais devem ser representados por uma string vazia** ```("campo": "")```. Caso o evento seja criado com sucesso será retornado o status, o id da task e o link para ela no Google Agenda, caso ocorra um erro, será exibido o erro.
 
@@ -253,14 +255,14 @@ Segue alguns exemplos de eventos:
 
 #### Retorna todos os eventos de um usuário
 ```http
-  GET /api/get_all_tasks/
+  GET /api/task/
 ```
-Ao realizar a requisição para essa URL, você obterá todos os eventos que o usuário é o propietário, e que **foram criados por meio da aplicação**, juntamente com suas respectivas informações, caso ocorra um erro, será exibido o erro.
+Ao realizar a requisição para essa URL, você **não deverá passar nenhum parâmetro no corpo da requisição, nem na URL**, e com isso você obterá todos os eventos que o usuário é o propietário, e que **foram criados por meio da aplicação**, juntamente com suas respectivas informações, caso ocorra um erro, será exibido o erro.
 
 
 #### Retorna um evento específico
 ```http
-  GET /api/get_task/
+  GET /api/task/
 ```
 Nessa URL, na seção de `body` será necessário selecionar JSON e colocar o seguinte formato de conteúdo, no qual a string a ser inserida deverá ser o id do evento a ser acessado (que foi retornado no processo de criação da tarefa), com isso, será retornado o status da solicitação, e todas as informações do evento requisitado, se o usuário for o propietário, caso ocorra um erro, será exibido o erro. Segue o exemplo de `body`:
 ```json
@@ -271,7 +273,7 @@ Nessa URL, na seção de `body` será necessário selecionar JSON e colocar o se
 
 #### Deletar um evento
 ```http
-  DELETE /api/delete/
+  DELETE /api/task/
 ```
 Nessa URL, na seção de `body` será necessário selecionar JSON e colocar o seguinte formato de conteúdo, no qual a string referente à id deverá ser o id do evento a ser deletado (que foi retornado no processo de criação da tarefa). Caso o evento seja deletado com sucesso, será exibida uma mensagem de sucesso, caso não, será exibido o erro. 
 Segue o exemplo de `body`:
@@ -283,7 +285,7 @@ Segue o exemplo de `body`:
 
 #### Atualizar um evento
 ```http
-  PATCH /api/update/
+  PATCH /api/task/
 ```
 Nessa URL, na seção de `body` será necessário selecionar JSON e colocar o seguinte formato de conteúdo, no qual a string referente à id deverá ser o id do evento a ser atualizado e os campos que deseja atualizar, juntamente com os valores a serem inseridos (só é necessário passar os valores que deseja atualizar). Caso a atualização seja feita com sucesso, será exibida uma mensagem de sucesso, caso não será exibido o erro.
 
@@ -327,7 +329,7 @@ Exemplos:
 
 #### Buscar por um evento
 ```http
-  GET /api/search?...<parametros>/
+  GET /api/task?...<parametros>/
 ```
 Nessa URL será necessário enviar, na própia URL, os seguinte parâmetros, os quais não são obrigatórios, mas no caso da busca ser realizada com base em mais de um parâmetro deve-se usaro separados `&`. Caso a solicitação seja feita com sucesso, serão exibidos os eventos que correspondem à sua busca, e que pertencem ao usuário atual, caso contrário, será exibida uma mensagem de erro:
 
@@ -345,10 +347,10 @@ Segue a tabela com os possíveis parâmetros.
 Exemplos:
 - Suponha que você queira buscar um evento que tenha `cinema` no título, que se inicie no dia `17 de novembro de 2024`, que tenha `Shopping` no local, e que tenha como participante `esposa`. Você terá algo como:
 ```http
-  GET /api/search?q=cinema&date_start=2024-11-17|2024-11-17&locale=shopping&participants=esposa/
+  GET /api/task?q=cinema&date_start=2024-11-17|2024-11-17&locale=shopping&participants=esposa/
 ```
 
 - Suponha que você queira buscar um evento que tenha `aula` no título, que se termine entre dia `5 de setembro de 2024` e `18 de novembro de 2025`, que tenha `online` no local. Você terá algo como:
 ```http
-  GET /api/search?q=aula&date_start=2024-09-05|2025-11-18&locale=online/
+  GET /api/task?q=aula&date_start=2024-09-05|2025-11-18&locale=online/
 ```
