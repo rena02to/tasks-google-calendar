@@ -194,6 +194,7 @@ Segue alguns exemplos:
 Segue alguns exemplos de eventos:
 - Um evento com o título de "Assistir Matrix no cinema", com a descrição "O filme comecará às 21h. Terei que comprar pipoca e refrigerantes, deverei chegar 30 minutos antes.", que será no local "Parque Shopping - CineSystem", que não será o dia todo, será no dia 17 de novembro de 2024, comecará às 21h e terminará às 23:30h, terá como participantes o usuário esposa@email.com e filho@email.com, não será recorrente e deverá ser avisado 1 dia antes por e-mail e 2 horas antes por notificação de popup, ficaria da seguinte forma:
 ```json
+{
     "title": "Assistir Matrix no cinema",
     "description": "O filme comecará às 21h. Terei que comprar pipoca e refrigerantes, deverei chegar 30 minutos antes.",
     "locale": "Parque Shopping - CineSystem",
@@ -204,7 +205,7 @@ Segue alguns exemplos de eventos:
     "end_hour": "23:30:00",
     "participants":[
         {"email": "esposa@email.com"},
-        {"email": "filho@email.com"},
+        {"email": "filho@email.com"}
     ],
     "reminders": [
         {"method": "email", "minutes": 1440},
@@ -212,6 +213,7 @@ Segue alguns exemplos de eventos:
     ],
     "appellant": false,
     "recurrence": ""
+}
 ```
 
 - Um evento com o título de "Aula de informática", sem descrição, que será no online, que não será o dia todo, será no dia 17 de novembro de 2024, comecará às 14h e terminará às 17h, terá como participantes o professor que tem o email professor@email.com, será recorrente nas segundas e quintas até o dia 30 de dezembro de 2025 e deverá ser 30 minutos antes por notificação de popup, ficaria da seguinte forma:
