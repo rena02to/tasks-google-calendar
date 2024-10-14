@@ -168,7 +168,7 @@ Segue descrição de como deve ser cada um dos valores
 | `participants`      | `array` | Os participantes que você deseja adicionar no evento. **Deverá ter o formato: `"participants": ["participante1@email.com", "participante2@email.com"]`**, no qual cada e-mail se refere ao e-mail de um participante. (**`Anulável`**) |
 | `reminders`      | `array` | Os métodos pelo qual você deseja receber as notificações sobre o evento. **Deverá ter o seguinte formato: `"reminders": [{"method": string, "minutes": int}, {"method": string, "minutes": int}]`**, no qual a string que corresponde ao `method` pode ser o valor `"email"` ou `"popup"`, e o valor inteiro que corresponde a `minutes` é o número de minutos antes do evento que o você será avisado. (`Anulável`) |
 | `appellant`      | `boolean` | Se o evento é recorrente. Isto é, se o evento acontece mais de uma vez ou se é somente no dia definido. Se for recorrente `"appellant": True`, senão `"appellant": False`|
-| `recurrence`      | `string` | A string de recorrência do evento. Essa string representa a recorrência do evento. A string se divide em algumas partes que estarão explicadas na tabela abaixo.
+| `recurrence`      | `string` | A string de recorrência do evento. Essa string representa a recorrência do evento. A string se divide em algumas partes que estarão explicadas na tabela abaixo. Caso não seja um evento recorrente, deverá ser passado `recurrence: null`, este parâmetro não deve ser ocultado|
 
 Tabela de definição da string de recorrência
 | Parâmetro   | Descrição                                   |
@@ -212,12 +212,13 @@ Segue alguns exemplos de eventos:
         {"method": "popup", "minutes": 120}
     ],
     "appellant": false,
-    "recurrence": ""
+    "recurrence": null
 }
 ```
 
 - Um evento com o título de "Aula de informática", sem descrição, que será no online, que não será o dia todo, será no dia 17 de novembro de 2024, comecará às 14h e terminará às 17h, terá como participantes o professor que tem o email professor@email.com, será recorrente nas segundas e quintas até o dia 30 de dezembro de 2025 e deverá ser 30 minutos antes por notificação de popup, ficaria da seguinte forma:
 ```json
+{
     "title": "Aula de informática",
     "description": "",
     "locale": "Online",
@@ -227,17 +228,19 @@ Segue alguns exemplos de eventos:
     "end_date": "2024-11-17",
     "end_hour": "17:00:00",
     "participants":[
-        {"email": "professor@email.com"},
+        {"email": "professor@email.com"}
     ],
     "reminders": [
         {"method": "popup", "minutes": 30}
     ],
     "appellant": true,
     "recurrence": "RRULE:FREQ=WEEKLY;BYDAY=MO,TH;UNTIL=20251230T235959Z"
+}
 ```
 
 - Um evento com o título de "Natal", sem descrição, que será o dia todo, será no dia 25 de dezembro, todos os anos, e deverá ser avisado 30 minutos antes, por popup (às 23:30:00 do dia 24 de dezembro) ficará da seguinte maneira:
 ```json
+{
     "title": "Natal",
     "description": "",
     "locale": "",
@@ -252,6 +255,7 @@ Segue alguns exemplos de eventos:
     ],
     "appellant": true,
     "recurrence": "RRULE:FREQ=YEARLY;"
+}
 ```
 
 
@@ -289,7 +293,7 @@ Segue o exemplo de `body`:
 ```http
   PATCH /api/task/
 ```
-Nessa URL, na seção de `body` será necessário selecionar JSON e colocar o seguinte formato de conteúdo, no qual a string referente à id deverá ser o id do evento a ser atualizado e os campos que deseja atualizar, juntamente com os valores a serem inseridos (só é necessário passar os valores que deseja atualizar). Caso a atualização seja feita com sucesso, será exibida uma mensagem de sucesso, caso não será exibido o erro.
+Nessa URL, na seção de `body` será necessário selecionar JSON e colocar o seguinte formato de conteúdo, no qual a string referente à id deverá ser o id do evento a ser atualizado e junto com todos os outros campos da task, juntamente com os valores a serem inseridos (só é necessário passar os valores que deseja atualizar). Caso a atualização seja feita com sucesso, será exibida uma mensagem de sucesso, caso não será exibido o erro.
 
 Segue um exemplo de `body`:
 ```json
@@ -299,31 +303,28 @@ Segue um exemplo de `body`:
 }
 ```
 
-Todos os campos da tabela de criação podem ser passados da mesma forma que são passados na criação de um evento, **EXCETO** `participants` e `reminders`. Segue a explicação de cada um:
-
-| Parâmetro   | Tipo       | Descrição                                   |
-| :---------- | :--------- | :------------------------------------------ |
-| `participants_add`      | Lista dos participantes a serem adicionados ((deve ser passado como uma lista com os participantes a serem inseridos) |
-| `participants_del`      | Lista dos participantes a serem deletados (deve ser passado como uma lista com os participantes a serem inseridos) |
-| `reminders_edit`      | Lista dos alertas a serem editados (pode ser passados da mesma forma que foram passados ao criar o evento, com a diferença que só pode ser editado o valor de `minutes`) |
-| `reminders_del`      | Lista dos alertas a serem deletados (no formato: `["alerta", "alerta"]`, em que cada `alerta` é o alerta que você deseja remover) |
-| `reminders_add`      | Lista dos alertas a serem adicionados (pode ser passados da mesma forma que foram passados ao criar o evento) |
+Deverão ser passados **TODOS OS DADOS DO EVENTO (incluindo os que não serão editados)** da mesma forma que na criação, e inlcuir o `id` do evendo que será editado.
 
 Exemplos:
-- Suponha que você queira editar o evento do cinema citado acima para remover a descrição, editar a data de início para 26 de setembro de 2024, remover um participante, remover a notificação por e-mail, editar a notificação por popup para 1h e remover um participante. Você terá algo como:
+- Suponha que você queira editar o evento do cinema citado na seção de criação para editar o título, remover a descrição, editar a data de início para 26 de setembro de 2024, remover um participante, remover a notificação por e-mail, editar a notificação por popup para 1h e 30min e remover um participante. Você terá algo como:
 ```json
 {
-    "description": "",
-    "date_start": "2024-09-26",
-    "participants_del":[
-        "filho@email.com"
+    "title": "Matrix - Parque Shopping",
+    "description": "O filme comecará às 21h. Terei que comprar pipoca e refrigerantes, deverei chegar 30 minutos antes.",
+    "locale": "Parque Shopping - CineSystem",
+    "full_day": false,
+    "start_date": "2024-09-26",
+    "start_hour": "21:00:00",
+    "end_date": "2024-09-26",
+    "end_hour": "23:30:00",
+    "participants":[
+        {"email": "esposa@email.com"}
     ],
-    "reminders_del": [
-        "email"
-    ],
-    "reminders_edit": [
+    "reminders": [
         {"method": "popup", "minutes": 150}
-    ]
+    ],
+    "appellant": false,
+    "recurrence": null
 }
 ```
 
