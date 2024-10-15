@@ -11,6 +11,7 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework_simplejwt.tokens import RefreshToken
 from .serializers import OAUTHTokenSerializer, TaskSerializer
 from google.oauth2.credentials import Credentials
+from django.db.models import Q
 
 User = get_user_model()
 
@@ -66,7 +67,7 @@ class Login(APIView):
             return Response({'message': f'An error occurred in the login process: {e}'}, status=status.HTTP_400_BAD_REQUEST)
 
 
-class TasksView(APIView):
+class TasksListView(APIView):
     permission_classes = [IsAuthenticated]
     def post(self, request):
         SCOPES = ['https://www.googleapis.com/auth/calendar']
@@ -156,24 +157,13 @@ class TasksView(APIView):
     #views that retrieve scheduled events do not retrieve all events
     #from the user's calendar, only those created by the application
     def get(self, request):
-        if request.data.get('id'):
+        if request.GET.dict():
             try:
-                #search the task by id
-                task = Task.objects.get(user=request.user.id, id=request.data.get('id'))
-                task = TaskSerializer(task).data
-                return Response(task, status=status.HTTP_200_OK)
-            except Task.DoesNotExist:
-                return Response({'message:': 'This task does not exist'}, status=status.HTTP_404_NOT_FOUND)
-            except Exception as e:
-                return Response({'message': f'An error occurred in the request: {e}'}, status=status.HTTP_400_BAD_REQUEST)
-        elif request.GET.dict():
-            try:
-                #recovers all user events
-                tasks = Task.objects.all()
-                tasks = tasks.filter(user=request.user)
 
                 #transforms the request url filters into a dictionary
                 filters = request.GET.dict()
+
+                filtros = Q()
 
                 #separate filters individually
                 query = filters.get('q')
@@ -184,33 +174,31 @@ class TasksView(APIView):
                 
                 #filter by search string, if any
                 if query:
-                    tasks = tasks.filter(title__icontains=query)
+                    filtros &= Q(title__icontains=query)
                 
                 #filter by the event start date, if any
                 if date_start:
                     interval_start_date = date_start.split('|')[0]
                     interval_end_date = date_start.split('|')[1]
-                    tasks = tasks.filter(start_date__range=(interval_start_date, interval_end_date))
+                    filtros &= Q(start_date__range=(interval_start_date, interval_end_date))
                 
                 #filter by the event end date, if any
                 if date_end:
                     interval_start_date = date_end.split('|')[0]
                     interval_end_date = date_end.split('|')[1]
-                    tasks = tasks.filter(end_date__range=(interval_start_date, interval_end_date))
+                    filtros &= Q(end_date__range=(interval_start_date, interval_end_date))
 
                 #filter by location (location is a string, which can be the address), if it exists
                 if locale:
-                    tasks = tasks.filter(locale__icontains=locale)
+                    filtros &= Q(locale__icontains=locale)
 
                 #filter by participants’ email, if any
                 if participants:
-                    tasks = [task for task in tasks if any(participants in participant.get('email', '') for participant in task.participants)]
+                    filtros &= Q([task for task in tasks if any(participants in participant.get('email', '') for participant in task.participants)])
 
-                if tasks:
-                    tasks = TaskSerializer(tasks, many=True).data
-                    return Response(tasks, status=status.HTTP_200_OK)
-                else:
-                    return Response({'message': 'There are no tasks with the specified search parameters'}, status=status.HTTP_404_NOT_FOUND)
+                tasks = Task.objects.filter(filtros, user=request.user.id)
+                tasks = TaskSerializer(tasks, many=True).data
+                return Response(tasks, status=status.HTTP_200_OK)
             except Exception as e:
                 return Response({'message': f'An error occurred in the request: {e}'}, status=status.HTTP_400_BAD_REQUEST)
         else:
@@ -221,13 +209,25 @@ class TasksView(APIView):
                 return Response(tasks, status=status.HTTP_200_OK)
             else:
                 return Response({'message': 'User has no registered tasks'}, status=status.HTTP_404_NOT_FOUND)
-            
+
+
+class TasksDetailView(APIView):
+    def get(self, request, id):
+        try:
+            #search the task by id
+            task = Task.objects.get(user=request.user.id, id=id)
+            task = TaskSerializer(task).data
+
+            return Response(task, status=status.HTTP_200_OK)
+        except Task.DoesNotExist:
+            return Response({'message:': 'This task does not exist'}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({'message': f'An error occurred in the request: {e}'}, status=status.HTTP_400_BAD_REQUEST)
     
-    
-    def delete(self, request):
+    def delete(self, request, id):
         #check the existence of the event
         try:
-            event = Task.objects.get(user=request.user.id, id=request.data.get('id'))
+            event = Task.objects.get(user=request.user.id, id=id)
 
             #if the user has permission to delete, redeem the Google Calendar token
             token = OAUTHToken.objects.get(user=request.user)
@@ -239,7 +239,7 @@ class TasksView(APIView):
 
             try:
                 #delete the event from Google Calendar
-                service.events().delete(calendarId='primary', eventId=request.data.get('id'), sendUpdates=request.data.get('sendUpdates')).execute()
+                service.events().delete(calendarId='primary', eventId=id, sendUpdates=request.data.get('sendUpdates')).execute()
 
                 #exclude the event from the db
                 event.delete()
@@ -256,70 +256,142 @@ class TasksView(APIView):
 
     #the update view, and delete view does not update the event if it
     #is not created by the application
-    def patch(self, request):
+    def put(self, request, id):
         try:
             user = request.user
             event = request.data
-            task = Task.objects.get(user=user.id, id=request.data.get('id'))
-
-            token = OAUTHToken.objects.get(user=user)
-            oauth_token = OAUTHTokenSerializer(token).data
-            
-            event = request.data
-            creds = Credentials(
-                token = oauth_token.get("access_token"),
-                refresh_token = oauth_token.get("refresh_token"),
-                token_uri=oauth_token.get('token_uri'),
-                client_id=oauth_token.get("client_id"),
-                client_secret=oauth_token.get("client_secret"),
-                scopes=oauth_token.get("scopes").split(','),
-            )
-
-            service = build('calendar', 'v3', credentials=creds)
-
-            event_format = {
-                'summary': event.get('title'),
-                'location': event.get('locale'),
-                'description': event.get('description'),
-                'start': {
-                    'timeZone': 'America/Sao_Paulo',
-                },
-                'end': {
-                    'timeZone': 'America/Sao_Paulo',
-                },
-                'attendees': event.get('participants'),
-                'reminders': {
-                    'useDefault': False,
-                    'overrides': event.get('reminders'),
-                }
-            }
-
-            if event.get('full_day') == True:
-                event_format['start']['date'] = event.get('start_date')
-                event_format['end']['date'] = event.get('end_date')
-
-                start_hour = None
-                end_hour = None
-            else:
-                if event.get('start_hour'):
-                    start_hour = event.get('start_hour')
-                else:
-                    start_hour = "09:00:00"
-                
-                if event.get('end_hour'):
-                    end_hour = event.get('end_hour')
-                else:
-                    end_hour = "10:00:00"
-                event_format['start']['dateTime'] = f'{event.get('start_date')}T{start_hour}-03:00'
-                event_format['end']['dateTime'] = f'{event.get('end_date')}T{end_hour}-03:00'
-            if event.get('appellant') == True:
-                event_format['recurrence'] = [event.get('recurrence')]
-
-            event['user'] = user.id
+            task = Task.objects.get(user=user.id, id=id)
             serializer = TaskSerializer(task, data=event)
+
             if serializer.is_valid():
+                serializer = serializer.data
+                token = OAUTHToken.objects.get(user=user)
+                oauth_token = OAUTHTokenSerializer(token).data
+                
+                event = request.data
+                creds = Credentials(
+                    token = oauth_token.get("access_token"),
+                    refresh_token = oauth_token.get("refresh_token"),
+                    token_uri=oauth_token.get('token_uri'),
+                    client_id=oauth_token.get("client_id"),
+                    client_secret=oauth_token.get("client_secret"),
+                    scopes=oauth_token.get("scopes").split(','),
+                )
+
+                service = build('calendar', 'v3', credentials=creds)
+
+                event_format = {
+                    'summary': event.get('title'),
+                    'location': event.get('locale'),
+                    'description': event.get('description'),
+                    'start': {
+                        'timeZone': 'America/Sao_Paulo',
+                    },
+                    'end': {
+                        'timeZone': 'America/Sao_Paulo',
+                    },
+                    'attendees': event.get('participants'),
+                    'reminders': {
+                        'useDefault': False,
+                        'overrides': event.get('reminders'),
+                    }
+                }
+
+                if event.get('full_day') == True:
+                    event_format['start']['date'] = event.get('start_date')
+                    event_format['end']['date'] = event.get('end_date')
+
+                    start_hour = None
+                    end_hour = None
+                else:
+                    if event.get('start_hour'):
+                        start_hour = event.get('start_hour')
+                    else:
+                        start_hour = "09:00:00"
+                    
+                    if event.get('end_hour'):
+                        end_hour = event.get('end_hour')
+                    else:
+                        end_hour = "10:00:00"
+                    event_format['start']['dateTime'] = f'{event.get('start_date')}T{start_hour}-03:00'
+                    event_format['end']['dateTime'] = f'{event.get('end_date')}T{end_hour}-03:00'
+                if event.get('appellant') == True:
+                    event_format['recurrence'] = [event.get('recurrence')]
+
+                event['user'] = user.id
+                event['id'] = id
                 serializer.save()
-                result = service.events().patch(calendarId='primary', eventId=event.get('id'), body=event_format).execute()
+                result = service.events().patch(calendarId='primary', eventId=id, body=event_format).execute()
+                return Response({'message': 'Event edited successfully!', 'link': result.get('htmlLink')}, status=status.HTTP_200_OK)
+            else:
+                return Response({'message': 'Invalid data', 'errors': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+        except Task.DoesNotExist:
+            return Response({'message': "The event does not exist."}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({'message': f"An error occurred in the request: {e}"}, status=status.HTTP_400_BAD_REQUEST)
+
+    def patch(self, request, id):
+        try:
+            user = request.user
+            task = Task.objects.get(user=user.id, id=id)
+            serializer = TaskSerializer(task, data=request.data, partial=True)
+
+            if serializer.is_valid():
+                token = OAUTHToken.objects.get(user=user)
+                oauth_token = OAUTHTokenSerializer(token).data
+                
+                creds = Credentials(
+                    token = oauth_token.get("access_token"),
+                    refresh_token = oauth_token.get("refresh_token"),
+                    token_uri=oauth_token.get('token_uri'),
+                    client_id=oauth_token.get("client_id"),
+                    client_secret=oauth_token.get("client_secret"),
+                    scopes=oauth_token.get("scopes").split(','),
+                )
+
+                service = build('calendar', 'v3', credentials=creds)
+                
+                serializer.save()
+
+                event_format = {
+                    'summary': serializer.data.get('title'),
+                    'location': serializer.data.get('locale'),
+                    'description': serializer.data.get('description'),
+                    'start': {
+                        'timeZone': 'America/Sao_Paulo',
+                    },
+                    'end': {
+                        'timeZone': 'America/Sao_Paulo',
+                    },
+                    'attendees': serializer.data.get('participants'),
+                    'reminders': {
+                        'useDefault': False,
+                        'overrides': serializer.data.get('reminders'),
+                    }
+                }
+
+                if serializer.data.get('full_day') == True:
+                    event_format['start']['date'] = serializer.data.get('start_date')
+                    event_format['end']['date'] = serializer.data.get('end_date')
+
+                    start_hour = None
+                    end_hour = None
+                else:
+                    if serializer.data.get('start_hour'):
+                        start_hour = serializer.data.get('start_hour')
+                    else:
+                        start_hour = "09:00:00"
+                    
+                    if serializer.data.get('end_hour'):
+                        end_hour = serializer.data.get('end_hour')
+                    else:
+                        end_hour = "10:00:00"
+                    event_format['start']['dateTime'] = f'{serializer.data.get('start_date')}T{start_hour}-03:00'
+                    event_format['end']['dateTime'] = f'{serializer.data.get('end_date')}T{end_hour}-03:00'
+                if serializer.data.get('appellant') == True:
+                    event_format['recurrence'] = [serializer.data.get('recurrence')]
+                    
+                result = service.events().patch(calendarId='primary', eventId=id, body=event_format).execute()
                 return Response({'message': 'Event edited successfully!', 'link': result.get('htmlLink')}, status=status.HTTP_200_OK)
             else:
                 return Response({'message': 'Invalid data', 'errors': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)

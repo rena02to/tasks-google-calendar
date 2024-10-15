@@ -1,9 +1,10 @@
 from django.urls import path
-from .views import Login, TasksView
+from .views import Login, TasksListView, TasksDetailView
 
 urlpatterns = [
     path('login/', Login.as_view(), name="login"),
-    path('task/', TasksView.as_view(), name="task"),
+    path('task/', TasksListView.as_view(), name="task-list"),
+    path('task/<str:id>/', TasksDetailView.as_view(), name="task-detail"),
 ]
 
 #views that retrieve scheduled events do not retrieve all events
