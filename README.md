@@ -268,20 +268,15 @@ Ao realizar a requisição para essa URL, você **não deverá passar nenhum par
 
 #### Retorna um evento específico
 ```http
-  GET /api/task/
+  GET /api/task/<str:id>/
 ```
-Nessa URL, na seção de `body` será necessário selecionar JSON e colocar o seguinte formato de conteúdo, no qual a string a ser inserida deverá ser o id do evento a ser acessado (que foi retornado no processo de criação da tarefa), com isso, será retornado o status da solicitação, e todas as informações do evento requisitado, se o usuário for o propietário, caso ocorra um erro, será exibido o erro. Segue o exemplo de `body`:
-```json
-{
-    id: string
-}
-```
+Nessa URL será necessário passar o **id da task na URL, sem nenhum valor no corpo (body) da requisição**, e com isso será retornado o status da solicitação, e todas as informações do evento requisitado, se o usuário for o propietário, caso ocorra um erro, será exibido o erro.
 
 #### Deletar um evento
 ```http
-  DELETE /api/task/
+  DELETE /api/task/<str:id>/
 ```
-Nessa URL, na seção de `body` será necessário selecionar JSON e colocar o seguinte formato de conteúdo, no qual a string referente à id deverá ser o id do evento a ser deletado (que foi retornado no processo de criação da tarefa). Caso o evento seja deletado com sucesso, será exibida uma mensagem de sucesso, caso não, será exibido o erro. 
+Nessa URL será necessário passar o id da task na URL. Caso o evento seja deletado com sucesso, será exibida uma mensagem de sucesso, caso não, será exibido o erro. 
 Segue o exemplo de `body`:
 ```json
 {
@@ -291,15 +286,14 @@ Segue o exemplo de `body`:
 
 #### Atualizar um evento
 ```http
-  PATCH /api/task/
+  PUT /api/task/<str:id>/
 ```
-Nessa URL, na seção de `body` será necessário selecionar JSON e colocar o seguinte formato de conteúdo, no qual a string referente à id deverá ser o id do evento a ser atualizado e junto com todos os outros campos da task, juntamente com os valores a serem inseridos (só é necessário passar os valores que deseja atualizar). Caso a atualização seja feita com sucesso, será exibida uma mensagem de sucesso, caso não será exibido o erro.
+Nessa URL será necessário passar o **id da task na URL**, e na seção de `body` será necessário selecionar JSON e colocar o seguinte formato de conteúdo, no qual **todos os dados da task devem ser passados**. Caso a atualização seja feita com sucesso, será exibida uma mensagem de sucesso, caso não será exibido o erro.
 
 Segue um exemplo de `body`:
 ```json
 {
-    id: string
-    ...outros campos a serem explicados a seguir
+    objeto completo a ser editado
 }
 ```
 
@@ -328,13 +322,35 @@ Exemplos:
 }
 ```
 
+```http
+  PATCH /api/task/<str:id>/
+```
+Nessa URL será necessário passar o **id da task na URL**, e na seção de `body` será necessário selecionar JSON e colocar o seguinte formato de conteúdo, no qual deverá ser passado **somente os campos e valores que deseja atualizar**. Caso a atualização seja feita com sucesso, será exibida uma mensagem de sucesso, caso não será exibido o erro.
+
+Segue um exemplo de `body`:
+```json
+{
+    ...campos que deseja atualizar
+}
+```
+
+Deverão ser passados **TODOS OS DADOS DO EVENTO (incluindo os que não serão editados)** da mesma forma que na criação, e inlcuir o `id` do evendo que será editado.
+
+Exemplos:
+- Suponha que você queira editar título do evendo do cinema mencionado anteriormente. Você terá algo como:
+```json
+{
+    "title": "Matrix - Parque Shopping"
+}
+```
+
 
 
 #### Buscar por um evento
 ```http
   GET /api/task?...<parametros>/
 ```
-Nessa URL será necessário enviar, na própia URL, os seguinte parâmetros, os quais não são obrigatórios, mas no caso da busca ser realizada com base em mais de um parâmetro deve-se usaro separados `&`. Caso a solicitação seja feita com sucesso, serão exibidos os eventos que correspondem à sua busca, e que pertencem ao usuário atual, caso contrário, será exibida uma mensagem de erro:
+Nessa URL será necessário enviar, **na própia URL, os seguinte parâmetros**, os quais não são obrigatórios, mas no caso da busca ser realizada com base em mais de um parâmetro deve-se usaro separados `&`. Caso a solicitação seja feita com sucesso, serão exibidos os eventos que correspondem à sua busca, e que pertencem ao usuário atual, caso contrário, será exibida uma mensagem de erro:
 
 Segue a tabela com os possíveis parâmetros.
 
